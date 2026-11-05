@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<title>계란 까는 주방</title>
+<meta name="description" content="유튜브 틀어 놓고 삶은 계란을 탁! 깨서 문질러 까는 3D 주방 놀이">
+<meta name="theme-color" content="#e9f3ef">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+</head>
+<body>
+<div class="tv" id="tv">
+  <form id="tvform">
+    <div>TV에 틀어 둘 유튜브 링크</div>
+    <input id="yt" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" inputmode="url" aria-label="유튜브 링크">
+    <button>틀기</button>
+  </form>
+</div>
+<div class="hud"><span class="chip" id="cnt">깐 계란 0개</span><span class="chip" id="today">오늘 0개</span></div>
+<div class="ticket"><span>주문 #<span id="ono">1</span></span><b id="otext">계란 8개</b><div class="bar"><i id="obar"></i></div></div>
+<div class="tools">
+  <button id="tvchange" hidden>TV 링크 바꾸기</button>
+  <button id="snd">주방 소리 켜기</button>
+</div>
+<div class="hint" id="hint"></div>
+<div class="toast" id="toast"></div>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
