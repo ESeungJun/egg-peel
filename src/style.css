@@ -1,0 +1,33 @@
+html, body { margin: 0; height: 100%; overflow: hidden; background: #e9f3ef; font-family: Pretendard, -apple-system, sans-serif; touch-action: none; user-select: none; -webkit-user-select: none; }
+canvas { position: fixed; inset: 0; display: block; }
+
+.tv { position: fixed; background: #0b0d10; overflow: hidden; display: grid; place-items: center; border-radius: 3px; }
+.tv iframe { width: 100%; height: 100%; border: 0; }
+.tv form { display: flex; flex-direction: column; gap: 8px; align-items: center; color: #c9d1d9; font-size: 13px; padding: 12px; text-align: center; }
+.tv input { width: min(320px, 82%); padding: 9px 12px; border-radius: 10px; border: 1px solid #3a4048; background: #161a1f; color: #eef; font: inherit; user-select: text; -webkit-user-select: text; }
+.tv button { padding: 7px 14px; border-radius: 999px; border: 0; background: #ff4d4d; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+
+.hud { position: fixed; left: max(16px, env(safe-area-inset-left)); top: max(14px, env(safe-area-inset-top)); display: flex; gap: 8px; flex-wrap: wrap; pointer-events: none; }
+.chip { background: #fff; color: #2b2622; border-radius: 999px; padding: 7px 12px; font-size: 13px; font-weight: 700; box-shadow: 0 2px 10px rgba(0,0,0,.18); }
+
+.ticket { position: fixed; right: max(16px, env(safe-area-inset-right)); top: max(14px, env(safe-area-inset-top)); width: 150px; background: #fffdf5; color: #2b2622; padding: 10px 12px 12px; font-size: 13px; box-shadow: 0 6px 18px rgba(0,0,0,.28); transform: rotate(2deg); border-top: 6px solid #34c38f; pointer-events: none; }
+.ticket b { display: block; font-size: 18px; margin-top: 2px; }
+.ticket .bar { height: 6px; border-radius: 3px; background: #eee3cc; margin-top: 8px; overflow: hidden; }
+.ticket .bar i { display: block; height: 100%; background: #34c38f; width: 0; transition: width .3s; }
+
+.tools { position: fixed; right: max(16px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom)); display: flex; gap: 8px; }
+.tools button { background: rgba(255,255,255,.95); color: #2b2622; border: 0; border-radius: 999px; padding: 8px 12px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.15); }
+.tools button[hidden] { display: none; }
+
+.hint { position: fixed; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); background: rgba(20,18,16,.78); color: #fff; padding: 8px 14px; border-radius: 999px; font-size: 13px; pointer-events: none; max-width: calc(100vw - 32px); text-align: center; }
+.toast { position: fixed; left: 50%; top: 46%; transform: translate(-50%,-50%) scale(.7); font-size: 38px; font-weight: 900; color: #fff; text-shadow: 0 3px 0 #b5651d, 0 8px 22px rgba(0,0,0,.45); opacity: 0; transition: opacity .18s, transform .28s cubic-bezier(.3,1.6,.5,1); pointer-events: none; white-space: nowrap; }
+.toast.on { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+.pop { position: fixed; font-weight: 900; font-size: 20px; color: #fff; text-shadow: 0 2px 0 #9a5a1a, 0 4px 10px rgba(0,0,0,.35); pointer-events: none; animation: pop .7s ease-out forwards; }
+@keyframes pop { from { opacity: 1; transform: translate(-50%,-50%) scale(.6) } 30% { transform: translate(-50%,-80%) scale(1.15) } to { opacity: 0; transform: translate(-50%,-160%) scale(1) } }
+
+@media (max-width: 600px) {
+  .ticket { width: 120px; font-size: 12px; }
+  .ticket b { font-size: 15px; }
+  .hint { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 44px); font-size: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .pop { animation-duration: .01s; } .toast { transition: none; } }
