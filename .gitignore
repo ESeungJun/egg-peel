@@ -1,0 +1,8 @@
+node_modules
+dist
+*.local
+.DS_Store
+.wrangler/
+
+# 사람이 보는 문서 html 판(로컬 전용)
+docs/html/
