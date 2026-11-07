@@ -6,6 +6,8 @@ export const steam: THREE.Sprite[] = []
 export const BOWL = new THREE.Vector3(0.32, TOP + 0.03, -0.2)
 export let plateMesh: THREE.Mesh
 export let tvLight: THREE.PointLight
+/** 벽 TV(틀·화면). 세로 폰에서 TV를 위쪽 띠로 뺄 때 숨긴다 */
+export const tvMeshes: THREE.Object3D[] = []
 
 /** 밝은 낮 주방: 민트 타일 벽, 나무 작업대, 선반, 냄비, TV, 껍질 그릇, 접시 */
 export function buildRoom() {
@@ -51,6 +53,7 @@ export function buildRoom() {
   tvFrame.position.set(0, 1.45, -0.665); tvFrame.castShadow = true; scene.add(tvFrame)
   const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.506), new THREE.MeshBasicMaterial({ color: 0x0b0d10 }))
   scr.position.set(0, 1.45, -0.641); scene.add(scr)
+  tvMeshes.push(tvFrame, scr)
 
   const tray = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.025, 0.26), mat(THEME.tray, { roughness: 0.9 }))
   tray.position.set(-0.62, TOP + 0.0125, -0.28); tray.receiveShadow = tray.castShadow = true; scene.add(tray)
