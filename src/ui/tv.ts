@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { camera } from '../core/stage'
+import { camera, VIEW } from '../core/stage'
 import { store } from '../game/state'
 
 const tv = document.getElementById('tv')!
@@ -9,9 +9,21 @@ const change = document.getElementById('tvchange') as HTMLButtonElement
 
 /** TV 화면 네 귀퉁이를 화면 좌표로 옮겨 HTML 플레이어를 그 위에 맞춘다 */
 const corners = [[-0.45, 0.253], [0.45, 0.253], [-0.45, -0.253], [0.45, -0.253]].map(([x, y]) => new THREE.Vector3(x, 1.45 + y, -0.64))
+/** 세로 폰(가로/세로 < 0.8)이면 TV를 화면 위쪽 띠로 뺀다. 띠 높이(px)를 돌려주고, 아니면 0 */
+export function tvBand(): number {
+  const band = innerWidth / innerHeight < 0.8
+  tv.classList.toggle('band', band)
+  document.body.classList.toggle('banded', band)
+  if (!band) return 0
+  tv.removeAttribute('style') // 벽 TV 자리에 맞추던 left/top/width/height 를 지우고 CSS 띠 크기를 쓴다
+  const h = Math.round(tv.getBoundingClientRect().height)
+  document.documentElement.style.setProperty('--band', h + 'px')
+  return h
+}
+
 export function placeTv() {
   const c = corners.map((p) => p.clone().project(camera))
-  const xs = c.map((p) => (p.x + 1) / 2 * innerWidth), ys = c.map((p) => (1 - p.y) / 2 * innerHeight)
+  const xs = c.map((p) => (p.x + 1) / 2 * VIEW.w), ys = c.map((p) => (1 - p.y) / 2 * VIEW.h + VIEW.top)
   Object.assign(tv.style, { left: Math.min(...xs) + 'px', top: Math.min(...ys) + 'px', width: (Math.max(...xs) - Math.min(...xs)) + 'px', height: (Math.max(...ys) - Math.min(...ys)) + 'px' })
 }
 

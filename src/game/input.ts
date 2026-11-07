@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { renderer, scene, camera, CAM, LOOK } from '../core/stage'
+import { renderer, scene, camera, CAM, LOOK, VIEW } from '../core/stage'
 import { canGrab, type Frag } from '../egg/crack'
 import { pile, buildPile } from '../egg/pile'
 import { S } from './state'
@@ -15,7 +15,7 @@ function aim(e: PointerEvent) {
   camera.lookAt(LOOK)
   camera.updateMatrixWorld()
   scene.updateMatrixWorld() // 방금 생긴 계란처럼 아직 한 번도 안 그려진 물체도 제자리에서 맞도록
-  ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1)
+  ndc.set(e.clientX / VIEW.w * 2 - 1, -((e.clientY - VIEW.top) / VIEW.h) * 2 + 1)
   ray.setFromCamera(ndc, camera)
 }
 const isFrag = (o: THREE.Object3D): o is Frag => !!(o as Frag).userData?.local

@@ -1,7 +1,7 @@
 import './style.css'
 import * as THREE from 'three'
 import { renderer, scene, camera, resizeStage, CAM, LOOK, CENTER, LAYOUT, PLATE, TOP } from './core/stage'
-import { buildRoom, buildLights, updateRoom } from './world/room'
+import { buildRoom, buildLights, updateRoom, tvMeshes } from './world/room'
 import { buildPile, pile } from './egg/pile'
 import { crackedEgg, faceCamera, exposeAround } from './egg/crack'
 import { S } from './game/state'
@@ -11,7 +11,7 @@ import { FX, updateFx } from './fx/effects'
 import { setAmbience, ambOn } from './audio/sound'
 import { store } from './game/state'
 import { hint, updateHud } from './ui/hud'
-import { initTv, placeTv } from './ui/tv'
+import { initTv, placeTv, tvBand } from './ui/tv'
 
 const ease = (t: number) => 1 - (1 - t) ** 3
 const timer = new THREE.Timer()
@@ -64,8 +64,10 @@ function tick(time: number) {
 }
 
 function resize() {
-  resizeStage()
-  placeTv()
+  const top = tvBand()
+  resizeStage(top)
+  if (top) for (const m of tvMeshes) m.visible = false
+  else { for (const m of tvMeshes) m.visible = true; placeTv() }
   // 화면을 돌리면 까던 계란도 새 자리로
   const c = S.center
   if (c && c.ready && !c.done) { c.group.position.copy(CENTER); c.group.scale.setScalar(LAYOUT.cs) }
