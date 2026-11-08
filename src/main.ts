@@ -7,7 +7,7 @@ import { crackedEgg, faceCamera, exposeAround } from './egg/crack'
 import { S } from './game/state'
 import { landOnPlate } from './game/actions'
 import { initInput } from './game/input'
-import { FX, updateFx, fxBusy } from './fx/effects'
+import { FX, updateFx } from './fx/effects'
 import { setAmbience, ambOn } from './audio/sound'
 import { store } from './game/state'
 import { hint, updateHud } from './ui/hud'
@@ -17,12 +17,6 @@ const ease = (t: number) => 1 - (1 - t) ** 3
 const timer = new THREE.Timer()
 const toPlate = new THREE.Vector3(PLATE.x, TOP + 0.06, PLATE.z)
 
-// 렌더 아끼기: 손이 닿았거나 무언가 움직이는 동안만 매 프레임 그리고, 가만히 있을 때는 초당 12번만 그린다.
-// 유튜브를 틀어 두고 멍하니 있는 놀이라 폰이 영상 재생과 3D를 동시에 풀로 돌리지 않게
-let lastInput = 0, lastDraw = 0
-const IDLE_MS = 1000 / 12
-addEventListener('pointerdown', () => { lastInput = performance.now() }, { capture: true })
-addEventListener('pointermove', () => { lastInput = performance.now() }, { capture: true, passive: true })
 
 function tick(time: number) {
   timer.update(time)
@@ -60,10 +54,6 @@ function tick(time: number) {
     updateFx(dt)
     updateRoom(dt, now)
   }
-  const busy = frozen || now - lastInput < 1500 || !!S.held || !!S.grab || !!S.spin || FX.shake > 0.0004 || fxBusy() ||
-    !!(c && (!c.ready || c.done || c.aim))
-  if (!busy && now - lastDraw < IDLE_MS) return
-  lastDraw = now
   camera.position.copy(CAM)
   if (FX.shake > 0.0004) {
     camera.position.x += (Math.random() - 0.5) * FX.shake
@@ -86,7 +76,6 @@ function resize() {
   movePile(-0.62 * k)
   for (const p of S.plated) p.position.x += PLATE.x - oldPlate
   toPlate.x = PLATE.x
-  lastDraw = 0
   // 화면을 돌리면 까던 계란도 새 자리로
   const c = S.center
   if (c && c.ready && !c.done) { c.group.position.copy(CENTER); c.group.scale.setScalar(LAYOUT.cs) }
