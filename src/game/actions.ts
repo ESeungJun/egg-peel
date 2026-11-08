@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { scene, camera, CAM, CENTER, TOP, EH, ER, PLATE, THEME, toScreen } from '../core/stage'
+import { scene, camera, CAM, CENTER, TOP, EH, ER, PLATE, THEME, toScreen, REDUCE_MOTION } from '../core/stage'
 import { mat } from '../core/materials'
 import { eggG, lowest } from '../egg/shape'
 import { crackedEgg, faceCamera, canGrab, exposeAround, disposeEgg, type CrackedEgg, type Frag } from '../egg/crack'
@@ -35,11 +35,19 @@ export function slam(s: number, sx: number, sy: number) {
   crackSound(s)
   navigator.vibrate?.(20 + s * 30)
   FX.hitstop = performance.now() + 85
-  FX.shake = 0.006 + s * 0.012
+  FX.shake = REDUCE_MOTION.matches ? 0 : 0.006 + s * 0.012
   squish(egg.group)
   crumbs(egg.group.position, 5 + Math.round(s * 6))
   popText(sx, sy, s > 0.6 ? '쩍!' : '탁!')
-  hint(S.center ? '금 간 계란은 지금 계란을 다 까고 누르면 와요' : '금 간 계란을 누르면 가운데로 와요')
+  if (S.center) { hint('금 간 계란은 지금 계란을 다 까고 누르면 와요'); return }
+  // 가운데가 비어 있으면 금이 간 걸 잠깐 보여 준 뒤 저절로 가운데로 가져온다(다시 누르는 단계를 없앤다)
+  hint('쩍! 금 간 계란이 앞으로 와요')
+  setTimeout(() => {
+    const i = S.counterEggs.findIndex((ce) => ce.egg === egg)
+    if (i < 0 || S.center) return
+    S.counterEggs.splice(i, 1)
+    bringToCenter(egg)
+  }, 520)
 }
 
 /** 천천히 내려놓으면 금이 안 간 채로 작업대에 놓인다 */
@@ -57,7 +65,7 @@ export function bringToCenter(egg: CrackedEgg) {
     from: egg.group.position.clone(), fromQ: egg.group.quaternion.clone(), toQ: faceCamera(egg.impact), t0: performance.now(),
     aim: null, aimFrom: null, aimT0: 0,
   }
-  hint('금 간 조각을 잡고 문질러 까세요 · 빈 곳을 끌면 계란이 돌아가요')
+  hint('금 간 조각을 문질러 까세요 · 빈 곳을 끌면 돌아가요')
 }
 
 /** 조각 떼기. 끄는 방향(dx, dy) 쪽 이웃이 막처럼 같이 딸려 온다 */
@@ -94,14 +102,26 @@ function finish() {
   plateSound()
   c.done = performance.now()
   countPeeled()
-  if (stats.prog >= stats.order) {
-    setTimeout(() => say(`주문 #${stats.ono} 완료!`), 1000)
-    stats.ono++
-    stats.order = 5 + Math.floor(Math.random() * 10)
-    stats.prog = 0
-    setTimeout(clearPlate, 1000)
-  }
   updateHud()
+  if (stats.prog >= stats.order) orderDone()
+}
+
+/** 주문 완료: 쪽지에 도장 → 쪽지가 날아가고 새 쪽지 → 접시를 비운다 */
+function orderDone() {
+  const t = document.querySelector('.ticket')!
+  const done = stats.ono
+  stats.ono++
+  stats.order = 5 + Math.floor(Math.random() * 10)
+  stats.prog = 0
+  setTimeout(() => { t.classList.add('done'); say(`주문 #${done} 완료!`); navigator.vibrate?.([30, 60, 30]) }, 700)
+  setTimeout(() => t.classList.add('away'), 1700)
+  setTimeout(() => {
+    clearPlate()
+    t.classList.remove('done', 'away')
+    t.classList.add('fresh')
+    updateHud()
+    requestAnimationFrame(() => requestAnimationFrame(() => t.classList.remove('fresh')))
+  }, 2200)
 }
 
 function clearPlate() { for (const p of S.plated) scene.remove(p); S.plated.length = 0 }

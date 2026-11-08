@@ -1,13 +1,13 @@
 import './style.css'
 import * as THREE from 'three'
-import { renderer, scene, camera, resizeStage, CAM, LOOK, CENTER, LAYOUT, PLATE, TOP } from './core/stage'
-import { buildRoom, buildLights, updateRoom, tvMeshes } from './world/room'
-import { buildPile, pile } from './egg/pile'
+import { renderer, scene, camera, resizeStage, CAM, LOOK, CENTER, LAYOUT, PLATE, TOP, BAND_SPREAD } from './core/stage'
+import { buildRoom, buildLights, updateRoom, tvMeshes, tvLight, spreadRoom } from './world/room'
+import { buildPile, pile, movePile } from './egg/pile'
 import { crackedEgg, faceCamera, exposeAround } from './egg/crack'
 import { S } from './game/state'
 import { landOnPlate } from './game/actions'
 import { initInput } from './game/input'
-import { FX, updateFx } from './fx/effects'
+import { FX, updateFx, fxBusy } from './fx/effects'
 import { setAmbience, ambOn } from './audio/sound'
 import { store } from './game/state'
 import { hint, updateHud } from './ui/hud'
@@ -16,6 +16,13 @@ import { initTv, placeTv, tvBand } from './ui/tv'
 const ease = (t: number) => 1 - (1 - t) ** 3
 const timer = new THREE.Timer()
 const toPlate = new THREE.Vector3(PLATE.x, TOP + 0.06, PLATE.z)
+
+// 렌더 아끼기: 손이 닿았거나 무언가 움직이는 동안만 매 프레임 그리고, 가만히 있을 때는 초당 12번만 그린다.
+// 유튜브를 틀어 두고 멍하니 있는 놀이라 폰이 영상 재생과 3D를 동시에 풀로 돌리지 않게
+let lastInput = 0, lastDraw = 0
+const IDLE_MS = 1000 / 12
+addEventListener('pointerdown', () => { lastInput = performance.now() }, { capture: true })
+addEventListener('pointermove', () => { lastInput = performance.now() }, { capture: true, passive: true })
 
 function tick(time: number) {
   timer.update(time)
@@ -53,6 +60,10 @@ function tick(time: number) {
     updateFx(dt)
     updateRoom(dt, now)
   }
+  const busy = frozen || now - lastInput < 1500 || !!S.held || !!S.grab || !!S.spin || FX.shake > 0.0004 || fxBusy() ||
+    !!(c && (!c.ready || c.done || c.aim))
+  if (!busy && now - lastDraw < IDLE_MS) return
+  lastDraw = now
   camera.position.copy(CAM)
   if (FX.shake > 0.0004) {
     camera.position.x += (Math.random() - 0.5) * FX.shake
@@ -66,8 +77,16 @@ function tick(time: number) {
 function resize() {
   const top = tvBand()
   resizeStage(top)
-  if (top) for (const m of tvMeshes) m.visible = false
-  else { for (const m of tvMeshes) m.visible = true; placeTv() }
+  // 세로 폰은 TV가 위쪽 띠로 나가므로 벽 TV 모형과 그 불빛을 끈다
+  for (const m of tvMeshes) m.visible = !top
+  tvLight.visible = !top
+  if (!top) placeTv()
+  const k = top ? BAND_SPREAD : 1, oldPlate = PLATE.x
+  spreadRoom(k)
+  movePile(-0.62 * k)
+  for (const p of S.plated) p.position.x += PLATE.x - oldPlate
+  toPlate.x = PLATE.x
+  lastDraw = 0
   // 화면을 돌리면 까던 계란도 새 자리로
   const c = S.center
   if (c && c.ready && !c.done) { c.group.position.copy(CENTER); c.group.scale.setScalar(LAYOUT.cs) }
@@ -94,14 +113,19 @@ initInput()
   for (const f of off) exposeAround(f)
   S.center = { ...egg, ready: true, done: 0, from: CENTER.clone(), fromQ: egg.group.quaternion.clone(), toQ: null, t0: 0, aim: null, aimFrom: null, aimT0: 0 }
 }
-hint('금 간 조각을 잡고 문질러 까세요 · 다 까면 더미에서 새 계란을 집어 탁!')
+hint('금 간 조각을 잡고 문질러 까세요')
 
 // 주방 소리: 지난번에 켰으면 첫 터치 때 다시 켠다(브라우저가 소리 자동 재생을 막아서)
 const snd = document.getElementById('snd') as HTMLButtonElement
-const label = () => { snd.textContent = ambOn() ? '주방 소리 끄기' : '주방 소리 켜기' }
+const label = () => { snd.textContent = ambOn() ? '주방 소리 끄기' : '주방 소리 켜기'; snd.setAttribute('aria-pressed', String(ambOn())) }
 snd.onclick = () => { setAmbience(!ambOn()); store.set('amb', ambOn() ? '1' : '0'); label() }
 if (store.get('amb') === '1') addEventListener('pointerdown', () => { if (!ambOn()) { setAmbience(true); label() } }, { once: true })
 
 addEventListener('resize', resize)
 renderer.setAnimationLoop(tick)
-if (import.meta.env.DEV) Object.assign(window, { __egg: { S, camera, scene, pile, THREE } })
+// 탭이 숨으면 3D를 아예 멈춘다(브라우저마다 rAF를 멈추는 정도가 달라서 직접 끈다)
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) renderer.setAnimationLoop(null)
+  else { timer.reset(); renderer.setAnimationLoop(tick) }
+})
+if (import.meta.env.DEV) Object.assign(window, { __egg: { S, camera, scene, pile, THREE, renderer, CAM, LOOK, CENTER } })

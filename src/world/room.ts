@@ -8,6 +8,8 @@ export let plateMesh: THREE.Mesh
 export let tvLight: THREE.PointLight
 /** 벽 TV(틀·화면). 세로 폰에서 TV를 위쪽 띠로 뺄 때 숨긴다 */
 export const tvMeshes: THREE.Object3D[] = []
+let tray: THREE.Mesh, bowl: THREE.Mesh, pot: THREE.Mesh, water: THREE.Mesh
+let potX = -1.05
 
 /** 밝은 낮 주방: 민트 타일 벽, 나무 작업대, 선반, 냄비, TV, 껍질 그릇, 접시 */
 export function buildRoom() {
@@ -42,9 +44,9 @@ export function buildRoom() {
     }
   }
 
-  const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.12, 0.17, 40, 1, true), mat(THEME.pot, { metalness: 0.8, roughness: 0.3, side: THREE.DoubleSide }))
+  pot = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.12, 0.17, 40, 1, true), mat(THEME.pot, { metalness: 0.8, roughness: 0.3, side: THREE.DoubleSide }))
   pot.position.set(-1.05, TOP + 0.085, -0.45); pot.castShadow = true; scene.add(pot)
-  const water = new THREE.Mesh(new THREE.CircleGeometry(0.12, 32), mat(0xdfe8ee, { roughness: 0.1 }))
+  water = new THREE.Mesh(new THREE.CircleGeometry(0.12, 32), mat(0xdfe8ee, { roughness: 0.1 }))
   water.rotation.x = -Math.PI / 2; water.position.set(-1.05, TOP + 0.15, -0.45); scene.add(water)
   const steamTex = canvasTex(64, 64, (g) => { const r = g.createRadialGradient(32, 32, 2, 32, 32, 30); r.addColorStop(0, 'rgba(255,255,255,.8)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 64, 64) })
   for (let i = 0; i < 6; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: steamTex, transparent: true, depthWrite: false })); s.userData.t = i / 6; scene.add(s); steam.push(s) }
@@ -55,15 +57,15 @@ export function buildRoom() {
   scr.position.set(0, 1.45, -0.641); scene.add(scr)
   tvMeshes.push(tvFrame, scr)
 
-  const tray = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.025, 0.26), mat(THEME.tray, { roughness: 0.9 }))
+  tray = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.025, 0.26), mat(THEME.tray, { roughness: 0.9 }))
   tray.position.set(-0.62, TOP + 0.0125, -0.28); tray.receiveShadow = tray.castShadow = true; scene.add(tray)
 
   const bowlPts: THREE.Vector2[] = []
   for (let i = 0; i <= 12; i++) { const t = i / 12 * Math.PI / 2; bowlPts.push(new THREE.Vector2(Math.sin(t) * 0.12 + 0.001, -Math.cos(t) * 0.06 + 0.06)) }
-  const bowl = new THREE.Mesh(new THREE.LatheGeometry(bowlPts, 40), mat(THEME.bowl, { metalness: 0.7, roughness: 0.3, side: THREE.DoubleSide }))
+  bowl = new THREE.Mesh(new THREE.LatheGeometry(bowlPts, 40), mat(THEME.bowl, { metalness: 0.7, roughness: 0.3, side: THREE.DoubleSide }))
   bowl.position.set(0.32, TOP, -0.2); bowl.castShadow = bowl.receiveShadow = true; scene.add(bowl)
 
-  plateMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.11, 0.018, 48), mat(0xfbfbf8, { roughness: 0.25 }))
+  plateMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.11, 0.018, 48), mat(0x9fd8bf, { roughness: 0.3 }))
   plateMesh.position.set(PLATE.x, TOP + 0.009, PLATE.z); plateMesh.receiveShadow = plateMesh.castShadow = true; scene.add(plateMesh)
 }
 
@@ -86,9 +88,22 @@ export function updateRoom(dt: number, now: number) {
   for (const s of steam) {
     s.userData.t = (s.userData.t + dt * 0.28) % 1
     const t = s.userData.t
-    s.position.set(-1.05 + Math.sin(t * 9 + s.id) * 0.03, TOP + 0.18 + t * 0.4, -0.45)
+    s.position.set(potX + Math.sin(t * 9 + s.id) * 0.03, TOP + 0.18 + t * 0.4, -0.45)
     s.scale.setScalar(0.08 + t * 0.16)
     s.material.opacity = Math.sin(t * Math.PI) * 0.45
   }
   tvLight.intensity = THEME.tvLightI * (0.85 + Math.sin(now / 900) * 0.1 + Math.sin(now / 230) * 0.05)
+}
+
+/**
+ * 세로 폰(TV 띠)에서는 화면 폭이 좁아 더미·접시가 가장자리에 작게 붙는다.
+ * 작업대 소품을 가운데 쪽으로 모아(k < 1) 카메라를 더 당길 수 있게 한다. k = 1 이 원래 배치.
+ */
+export function spreadRoom(k: number) {
+  PLATE.x = 0.62 * k
+  plateMesh.position.x = PLATE.x
+  tray.position.x = -0.62 * k
+  potX = k < 1 ? -1.05 * k - 0.06 : -1.05
+  pot.position.x = water.position.x = potX
+  bowl.visible = k === 1 // 좁힌 배치에서는 접시와 겹치고, 쓰임도 없어 뺀다
 }
