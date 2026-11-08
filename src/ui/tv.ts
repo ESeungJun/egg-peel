@@ -6,6 +6,8 @@ const tv = document.getElementById('tv')!
 const form = document.getElementById('tvform') as HTMLFormElement
 const input = document.getElementById('yt') as HTMLInputElement
 const change = document.getElementById('tvchange') as HTMLButtonElement
+const err = document.getElementById('yterr')!
+const cancel = document.getElementById('ytcancel') as HTMLButtonElement
 
 /** TV 화면 네 귀퉁이를 화면 좌표로 옮겨 HTML 플레이어를 그 위에 맞춘다 */
 const corners = [[-0.45, 0.253], [0.45, 0.253], [-0.45, -0.253], [0.45, -0.253]].map(([x, y]) => new THREE.Vector3(x, 1.45 + y, -0.64))
@@ -40,6 +42,15 @@ export function embedUrl(v: string, autoplay: boolean) {
   return `https://www.youtube-nocookie.com/embed/${path}?${q}`
 }
 
+/** 링크 폼을 닫는다. 영상이 있으면 영상만 남긴다 */
+function closeForm() {
+  form.classList.remove('over')
+  form.remove()
+  cancel.hidden = true
+  err.textContent = ''
+  change.hidden = !tv.querySelector('iframe')
+}
+
 function mount(src: string) {
   const f = document.createElement('iframe')
   f.src = src
@@ -54,11 +65,27 @@ export function initTv() {
   form.onsubmit = (e) => {
     e.preventDefault()
     const v = input.value.trim(), src = embedUrl(v, true)
-    if (!src) { input.value = ''; input.placeholder = '유튜브 링크를 다시 확인해 주세요'; return }
+    // 틀린 링크도 지우지 않고 남겨서 고칠 수 있게 한다
+    if (!src) { err.textContent = v ? '유튜브 영상이나 재생목록 주소가 아니에요. youtube.com/watch?v=… 나 youtu.be/… 주소를 붙여 넣어 주세요' : '유튜브 링크를 붙여 넣어 주세요'; input.focus(); return }
     store.set('yt', v)
+    err.textContent = ''
+    cancel.hidden = true
+    form.classList.remove('over')
     mount(src)
   }
-  change.onclick = () => { input.value = store.get('yt') ?? ''; tv.replaceChildren(form); change.hidden = true; input.focus() }
+  input.oninput = () => { err.textContent = '' }
+  // 링크 바꾸기: 보던 영상은 그대로 두고 그 위에 폼을 띄운다. 취소하면 영상으로 돌아간다
+  change.onclick = () => {
+    input.value = store.get('yt') ?? ''
+    form.classList.add('over')
+    tv.appendChild(form)
+    cancel.hidden = false
+    change.hidden = true
+    input.focus()
+    input.select()
+  }
+  cancel.onclick = closeForm
+  form.onkeydown = (e) => { if (e.key === 'Escape' && !cancel.hidden) closeForm() }
   // 지난번 링크: 소리 있는 자동 재생은 브라우저가 막으니 재생 버튼만 띄워 둔다
   const last = store.get('yt'), src = last && embedUrl(last, false)
   if (src) mount(src)

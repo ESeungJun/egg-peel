@@ -23,11 +23,16 @@ export const LAYOUT = { cs: 3.1, fov: 50, portrait: false } // cs: 까는 자리
 const LAND = { cam: [0, 1.4, 1.0], look: [0, 1.2, -0.5], center: [0, 1.1, 0.25], cs: 3.1, fov: 50 }
 const PORT = { cam: [0, 1.62, 1.95], look: [0, 1.12, -0.3], center: [0, 1.3, 1.3], cs: 3.6, fov: 75 }
 // 세로 폰 + 위쪽 TV 띠: 벽 TV를 비출 필요가 없으니 시선을 작업대로 내린다
-const BAND = { cam: [0, 1.5, 1.85], look: [0, 0.98, -0.3], center: [0, 1.2, 1.2], cs: 3.6, fov: 70 }
+const BAND = { cam: [0, 1.62, 1.3], look: [0, 0.92, -0.3], center: [0, 1.26, 0.78], cs: 3.4, fov: 66 }
+/** 세로 폰(TV 띠)에서 작업대 소품을 가운데로 모으는 배율(world/room.ts spreadRoom) */
+export const BAND_SPREAD = 0.62
+
 export const COARSE = matchMedia('(pointer: coarse)').matches
+export const REDUCE_MOTION = matchMedia('(prefers-reduced-motion: reduce)')
 
 export const renderer = new THREE.WebGLRenderer({ antialias: true })
-renderer.setPixelRatio(Math.min(2, devicePixelRatio))
+// 폰은 유튜브 재생과 같이 돌아가므로 픽셀 배율을 1.5까지로 (배터리·발열)
+renderer.setPixelRatio(Math.min(COARSE ? 1.5 : 2, devicePixelRatio))
 renderer.outputColorSpace = THREE.SRGBColorSpace
 renderer.shadowMap.enabled = true
 renderer.shadowMap.type = THREE.PCFShadowMap // 0.187부터 PCFSoft는 없어지고 PCF가 부드럽게 처리한다

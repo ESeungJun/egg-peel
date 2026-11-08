@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { renderer, scene, camera, CAM, LOOK, VIEW } from '../core/stage'
+import { renderer, scene, camera, CAM, LOOK, VIEW, toScreen } from '../core/stage'
 import { canGrab, type Frag } from '../egg/crack'
 import { pile, buildPile } from '../egg/pile'
 import { S } from './state'
@@ -19,6 +19,13 @@ function aim(e: PointerEvent) {
   ray.setFromCamera(ndc, camera)
 }
 const isFrag = (o: THREE.Object3D): o is Frag => !!(o as Frag).userData?.local
+
+/** 화면에서 (x, y)에 가장 가까운 것(r px 안). 없으면 undefined */
+function nearest<T>(list: T[], obj: (t: T) => THREE.Object3D, x: number, y: number, r: number): T | undefined {
+  let best: T | undefined, bd = r
+  for (const t of list) { const p = toScreen(obj(t)), d = Math.hypot(p.x - x, p.y - y); if (d < bd) { bd = d; best = t } }
+  return best
+}
 
 function onDown(e: PointerEvent) {
   if (e.button > 0) return
@@ -40,15 +47,19 @@ function onDown(e: PointerEvent) {
     }
     if (hit) { S.spin = { x: e.clientX, y: e.clientY }; c.aim = null; return }
   }
-  // 작업대 위 계란
-  for (const ce of S.counterEggs) {
-    if (!ray.intersectObject(ce.group, true).length) continue
-    if (ce.egg && !S.center) { S.counterEggs.splice(S.counterEggs.indexOf(ce), 1); bringToCenter(ce.egg); return }
-    if (!ce.egg) { S.counterEggs.splice(S.counterEggs.indexOf(ce), 1); pickUp(ce.group as THREE.Mesh, ray.ray.intersectPlane(holdPlane, tmp)); return }
+  // 작업대 위 계란: 정확히 맞지 않아도 손가락 근처(r px)면 잡는다. 폰에서는 계란이 지름 10px 남짓이라
+  const r = e.pointerType === 'mouse' ? 24 : 44
+  const usable = S.counterEggs.filter((ce) => !ce.egg || !S.center)
+  const ce = usable.find((x) => ray.intersectObject(x.group, true).length) ?? nearest(usable, (x) => x.group, e.clientX, e.clientY, r)
+  if (ce) {
+    S.counterEggs.splice(S.counterEggs.indexOf(ce), 1)
+    if (ce.egg) bringToCenter(ce.egg)
+    else pickUp(ce.group as THREE.Mesh, ray.ray.intersectPlane(holdPlane, tmp))
+    return
   }
-  const ph = ray.intersectObjects(pile, false)[0]
-  if (ph) {
-    const m = ph.object as THREE.Mesh
+  const pm = (ray.intersectObjects(pile, false)[0]?.object as THREE.Mesh | undefined) ?? nearest(pile, (m) => m, e.clientX, e.clientY, r)
+  if (pm) {
+    const m = pm
     pile.splice(pile.indexOf(m), 1)
     pickUp(m, ray.ray.intersectPlane(holdPlane, tmp))
     if (pile.length < 10) setTimeout(buildPile, 500)

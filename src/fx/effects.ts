@@ -9,6 +9,8 @@ const flying: Flying[] = []
 const falling: { m: THREE.Object3D; v: number }[] = []
 const squash: Squash[] = []
 export const FX = { hitstop: 0, shake: 0 }
+/** 날아가는 조각·떨어지는 계란·찌그러짐이 남아 있으면 true (렌더를 쉬어도 되는지 판단용) */
+export const fxBusy = () => flying.length + falling.length + squash.length > 0
 
 /** 장면에서 떨어져 나가 튕기다 사라지는 조각. 재질은 복제해서 따로 투명하게 만든다 */
 export function fling(m: THREE.Mesh, v: THREE.Vector3, life = 1.6) {
