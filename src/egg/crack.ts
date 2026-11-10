@@ -2,6 +2,13 @@ import * as THREE from 'three'
 import { CAM, CENTER } from '../core/stage'
 import { shellMat, whiteMat } from '../core/materials'
 import { eggGeo } from './shape'
+import { fracture, weld } from './fracture'
+
+// 흰자와 껍질 바탕은 한 번만 만든다. 껍질은 삼각형 8,820개(가장 긴 변 약 1.5mm)
+const WHITE_G = eggGeo(12)
+const SHELL_G = eggGeo(20)
+const BASE = weld(SHELL_G.attributes.position.array as Float32Array)
+const SHELL_N = SHELL_G.attributes.normal.array as Float32Array
 
 export type FragState = 'cracked' | 'hair' | 'intact'
 export interface FragData {
@@ -16,8 +23,6 @@ export interface FragData {
 }
 export type Frag = THREE.Mesh & { userData: FragData }
 export interface CrackedEgg { group: THREE.Group; white: THREE.Mesh; frags: Frag[]; impact: THREE.Vector3 }
-
-function hash(x: number, y: number, z: number) { const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return s - Math.floor(s) }
 
 const LIFT: Record<0 | 1 | 2, [number, number]> = { 0: [1, 1], 1: [1.002, 0.995], 2: [1.01, 0.955] }
 export function setLift(f: Frag, lv: 0 | 1 | 2) {
@@ -39,55 +44,19 @@ export function exposeAround(f: Frag) { for (const o of f.userData.nb) if (!o.us
  */
 export function crackedEgg(strength: number, down = new THREE.Vector3(0, -1, 0)): CrackedEgg {
   const group = new THREE.Group()
-  const white = new THREE.Mesh(eggGeo(48, 40), whiteMat)
+  const white = new THREE.Mesh(WHITE_G, whiteMat)
   white.scale.setScalar(0.975)
   white.castShadow = true
   group.add(white)
 
-  const sg = eggGeo(56, 44).toNonIndexed()
-  const pos = sg.attributes.position, nor = sg.attributes.normal
-  const P0 = new THREE.Vector3()
-  const impact = new THREE.Vector3()
-  let best = -1e9
-  for (let i = 0; i < pos.count; i++) { const d = P0.fromBufferAttribute(pos, i).dot(down); if (d > best) { best = d; impact.copy(P0) } }
-
-  // 금 씨앗: 부딪힌 곳 근처는 촘촘하게, 멀수록 듬성듬성
-  const sigma = 0.012 + strength * 0.02, n = 14 + Math.round(strength * 16)
-  const seeds = [impact.clone()]
-  for (let tries = 0; seeds.length < n && tries < 4000; tries++) {
-    const p = new THREE.Vector3().fromBufferAttribute(pos, Math.floor(Math.random() * pos.count)), d = p.distanceTo(impact)
-    if (Math.random() > 0.15 + 0.85 * Math.exp(-d / sigma)) continue
-    const minD = 0.003 + d * 0.35
-    if (seeds.every((s) => s.distanceTo(p) > minD)) seeds.push(p)
-  }
-  const wts = seeds.map(() => 0.8 + Math.random() * 0.45), salt = Math.random() * 100
-
-  // 삼각형마다 가장 가까운 씨앗(가중·흔들림)에 붙인다
-  const tris: number[][] = seeds.map(() => [])
-  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), m = new THREE.Vector3()
-  for (let t = 0; t < pos.count; t += 3) {
-    a.fromBufferAttribute(pos, t); b.fromBufferAttribute(pos, t + 1); c.fromBufferAttribute(pos, t + 2)
-    m.copy(a).add(b).add(c).divideScalar(3)
-    let bi = 0, bd = 1e9
-    for (let i = 0; i < seeds.length; i++) {
-      const d = seeds[i].distanceTo(m) / wts[i] * (1 + (hash(m.x * 900 + salt, m.y * 900, i) - 0.5) * 0.45)
-      if (d < bd) { bd = d; bi = i }
-    }
-    tris[bi].push(t)
-  }
-
-  const arr = pos.array as Float32Array, narr = nor.array as Float32Array
-  const key = (i: number) => `${Math.round(arr[i * 3] * 1e5)},${Math.round(arr[i * 3 + 1] * 1e5)},${Math.round(arr[i * 3 + 2] * 1e5)}`
-  const edgeOwner = new Map<string, Frag>()
-  const frags: Frag[] = []
-  tris.forEach((list, i) => {
-    if (!list.length) return
+  const { impact, pieces } = fracture(BASE, strength, down)
+  const arr = BASE.pos
+  const frags = pieces.map((pc) => {
+    const list = pc.tris
     const P = new Float32Array(list.length * 9), N = new Float32Array(list.length * 9), cen = new THREE.Vector3()
     list.forEach((t, j) => {
-      for (let v = 0; v < 3; v++) {
-        for (let k = 0; k < 3; k++) { P[j * 9 + v * 3 + k] = arr[(t + v) * 3 + k]; N[j * 9 + v * 3 + k] = narr[(t + v) * 3 + k] }
-        cen.x += arr[(t + v) * 3]; cen.y += arr[(t + v) * 3 + 1]; cen.z += arr[(t + v) * 3 + 2]
-      }
+      P.set(arr.subarray(t * 9, t * 9 + 9), j * 9); N.set(SHELL_N.subarray(t * 9, t * 9 + 9), j * 9)
+      for (let v = 0; v < 9; v += 3) { cen.x += arr[t * 9 + v]; cen.y += arr[t * 9 + v + 1]; cen.z += arr[t * 9 + v + 2] }
     })
     cen.divideScalar(list.length * 3)
     for (let j = 0; j < P.length; j += 3) { P[j] -= cen.x; P[j + 1] -= cen.y; P[j + 2] -= cen.z }
@@ -96,18 +65,11 @@ export function crackedEgg(strength: number, down = new THREE.Vector3(0, -1, 0))
     g.setAttribute('normal', new THREE.BufferAttribute(N, 3))
     const f = new THREE.Mesh(g, shellMat) as unknown as Frag
     f.castShadow = true
-    f.userData = { local: cen.clone(), base: cen.clone(), nb: new Set(), dist: seeds[i].distanceTo(impact), state: 'intact', lift: 0, gone: false, wig: 0 }
-    // 같은 모서리를 가진 조각끼리 이웃
-    for (const t of list) for (let e = 0; e < 3; e++) {
-      const k1 = key(t + e), k2 = key(t + (e + 1) % 3)
-      if (k1 === k2) continue
-      const ek = k1 < k2 ? k1 + '|' + k2 : k2 + '|' + k1, o = edgeOwner.get(ek)
-      if (o && o !== f) { o.userData.nb.add(f); f.userData.nb.add(o) } else if (!o) edgeOwner.set(ek, f)
-    }
+    f.userData = { local: cen.clone(), base: cen.clone(), nb: new Set(), dist: pc.dist, state: 'intact', lift: 0, gone: false, wig: 0 }
     group.add(f)
-    frags.push(f)
+    return f
   })
-  sg.dispose()
+  pieces.forEach((pc, i) => { for (const o of pc.nb) frags[i].userData.nb.add(frags[o]) })
 
   // 부딪힌 곳 근처만 벌어지고, 그 바깥은 실금, 나머지는 멀쩡
   const crackR = 0.007 + strength * 0.017
@@ -126,6 +88,5 @@ export function faceCamera(impact: THREE.Vector3) {
 }
 
 export function disposeEgg(e: CrackedEgg) {
-  e.white.geometry.dispose()
   for (const f of e.frags) if (!f.userData.gone) f.geometry.dispose() // 떨어진 조각은 날아가는 쪽에서 해제
 }

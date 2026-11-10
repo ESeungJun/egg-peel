@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "test": "node --test",
     "preview": "vite preview",
     "deploy": "npm run build && npx --yes wrangler pages deploy dist --project-name egg-peel --branch main"
   },
