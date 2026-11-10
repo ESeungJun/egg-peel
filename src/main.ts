@@ -1,13 +1,13 @@
 import './style.css'
 import * as THREE from 'three'
-import { renderer, scene, camera, resizeStage, CAM, LOOK, CENTER, LAYOUT, PLATE, TOP, BAND_SPREAD } from './core/stage'
+import { renderer, scene, camera, resizeStage, shadowDirty, CAM, LOOK, CENTER, LAYOUT, PLATE, TOP, BAND_SPREAD } from './core/stage'
 import { buildRoom, buildLights, updateRoom, tvMeshes, tvLight, spreadRoom } from './world/room'
 import { buildPile, pile, movePile } from './egg/pile'
 import { crackedEgg, faceCamera, exposeAround } from './egg/crack'
 import { S } from './game/state'
 import { landOnPlate } from './game/actions'
 import { initInput } from './game/input'
-import { FX, updateFx } from './fx/effects'
+import { FX, updateFx, fxBusy } from './fx/effects'
 import { setAmbience, ambOn } from './audio/sound'
 import { store } from './game/state'
 import { hint, updateHud } from './ui/hud'
@@ -22,6 +22,8 @@ function tick(time: number) {
   timer.update(time)
   const dt = Math.min(0.04, timer.getDelta()), now = performance.now(), frozen = now < FX.hitstop
   const c = S.center
+  // 그림자를 내는 것이 움직이는 프레임에만 그림자 맵을 다시 그린다. 숨 쉬는 움직임(±4mm)은 뺀다
+  let moving = !!S.held || !!S.spin || !!S.grab || fxBusy() || (!!c && (!c.ready || !!c.done || !!c.aim))
   if (!frozen) {
     if (c) {
       if (!c.ready) {
@@ -47,6 +49,7 @@ function tick(time: number) {
       if (S.center) for (const f of S.center.frags) {
         const u = f.userData
         if (!u.wig || u.gone) continue
+        moving = true
         const t = (now - u.wig) / 260
         if (t >= 1) { f.position.copy(u.base); u.wig = 0 } else f.position.copy(u.base).multiplyScalar(1 + Math.sin(t * 40) * (1 - t) * 0.012)
       }
@@ -61,6 +64,7 @@ function tick(time: number) {
     if (!frozen) FX.shake *= Math.exp(-dt * 9) // 프레임 수와 상관없이 0.3초쯤에 잦아든다
   }
   camera.lookAt(LOOK)
+  if (moving || fxBusy()) shadowDirty()
   renderer.render(scene, camera)
 }
 

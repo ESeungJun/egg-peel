@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { scene, TOP, EH } from '../core/stage'
+import { scene, TOP, EH, shadowDirty } from '../core/stage'
 import { shellMat } from '../core/materials'
 import { eggG } from './shape'
 
@@ -27,6 +27,7 @@ export function buildPile() {
       pile.push(m)
     }
   })
+  shadowDirty()
 }
 
 /** 더미 자리를 옮긴다(세로 폰 배치). 남은 계란도 같이 옮긴다 */

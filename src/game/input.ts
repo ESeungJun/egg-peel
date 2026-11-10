@@ -1,14 +1,16 @@
 import * as THREE from 'three'
-import { renderer, scene, camera, CAM, LOOK, VIEW, toScreen } from '../core/stage'
+import { renderer, scene, camera, CAM, LOOK, VIEW, LAYOUT, toScreen, shadowDirty } from '../core/stage'
+import { HOLD_Z } from '../core/dims'
 import { canGrab, type Frag } from '../egg/crack'
 import { pile, buildPile } from '../egg/pile'
 import { S } from './state'
-import { pickUp, slam, setDown, bringToCenter, peel, nearGrabbable, aimFrontier, REST_UPRIGHT } from './actions'
+import { pickUp, slam, setDown, bringToCenter, peel, nearGrabbable, aimFrontier, emptyBowl, REST_UPRIGHT } from './actions'
+import { bowl } from '../world/room'
 import { audio, nopeSound } from '../audio/sound'
 import { hint } from '../ui/hud'
 
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), tmp = new THREE.Vector3()
-const holdPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -0.05) // 들고 있는 계란이 움직이는 면(z=0.05)
+const holdPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -HOLD_Z) // 들고 있는 계란이 움직이는 면
 function aim(e: PointerEvent) {
   // 화면 흔들림이 섞이지 않은 원래 시점으로 광선을 쏜다(흔들리는 중에 눌러도 빗나가지 않게)
   camera.position.copy(CAM)
@@ -65,6 +67,7 @@ function onDown(e: PointerEvent) {
     if (pile.length < 10) setTimeout(buildPile, 500)
     return
   }
+  if (ray.intersectObject(bowl, false).length) { emptyBowl(); return }
   if (c && c.ready) { S.spin = { x: e.clientX, y: e.clientY }; c.aim = null }
 }
 
@@ -74,8 +77,9 @@ function onMove(e: PointerEvent) {
   if (S.held) {
     if (!ray.ray.intersectPlane(holdPlane, tmp)) return
     const rest: number = S.held.userData.rest
-    const y = Math.max(rest, Math.min(1.7, tmp.y)), x = Math.max(-1.2, Math.min(1.2, tmp.x))
-    S.held.position.set(x, y, 0.05)
+    // 위쪽 한계: 벽 TV(HTML)에 가려지지 않는 높이까지만
+    const y = Math.max(rest, Math.min(LAYOUT.ceil, tmp.y)), x = Math.max(-1.2, Math.min(1.2, tmp.x))
+    S.held.position.set(x, y, HOLD_Z)
     S.hist.push({ y, t: now })
     while (S.hist.length > 2 && now - S.hist[0].t > 120) S.hist.shift()
     const h = S.hist, vy = h.length > 1 ? (h[h.length - 1].y - h[0].y) / ((h[h.length - 1].t - h[0].t) / 1000 || 1) : 0
@@ -114,6 +118,7 @@ function onUp() {
   if (S.held) setDown()
   S.grab = null
   S.spin = null
+  shadowDirty() // 마지막 프레임 뒤에 돌린 만큼도 그림자에 반영
 }
 
 const el = renderer.domElement

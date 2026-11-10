@@ -1,14 +1,19 @@
 import * as THREE from 'three'
 import { scene, THEME, TOP, PLATE, COARSE } from '../core/stage'
-import { mat, canvasTex } from '../core/materials'
+import { mat, canvasTex, shellMat } from '../core/materials'
 
 export const steam: THREE.Sprite[] = []
-export const BOWL = new THREE.Vector3(0.32, TOP + 0.03, -0.2)
+/** 껍질 그릇 안쪽(뗀 조각이 날아가 담기는 자리) */
+export const BOWL = new THREE.Vector3(0.32, TOP + 0.045, -0.2)
+/** 그릇에 담기는 껍질 조각 수(계란 열 개쯤) */
+export const BOWL_MAX = 220
+export let bowl: THREE.Mesh
+let shells: THREE.InstancedMesh
 export let plateMesh: THREE.Mesh
 export let tvLight: THREE.PointLight
 /** 벽 TV(틀·화면). 세로 폰에서 TV를 위쪽 띠로 뺄 때 숨긴다 */
 export const tvMeshes: THREE.Object3D[] = []
-let tray: THREE.Mesh, bowl: THREE.Mesh, pot: THREE.Mesh, water: THREE.Mesh
+let tray: THREE.Mesh, pot: THREE.Mesh, water: THREE.Mesh
 let potX = -1.05
 
 /** 밝은 낮 주방: 민트 타일 벽, 나무 작업대, 선반, 냄비, TV, 껍질 그릇, 접시 */
@@ -64,6 +69,12 @@ export function buildRoom() {
   for (let i = 0; i <= 12; i++) { const t = i / 12 * Math.PI / 2; bowlPts.push(new THREE.Vector2(Math.sin(t) * 0.12 + 0.001, -Math.cos(t) * 0.06 + 0.06)) }
   bowl = new THREE.Mesh(new THREE.LatheGeometry(bowlPts, 40), mat(THEME.bowl, { metalness: 0.7, roughness: 0.3, side: THREE.DoubleSide }))
   bowl.position.set(0.32, TOP, -0.2); bowl.castShadow = bowl.receiveShadow = true; scene.add(bowl)
+  // 그릇에 쌓이는 껍질 조각. 그릇의 자식이라 그릇을 옮기거나 누르면 같이 움직인다
+  const chip = new THREE.SphereGeometry(0.024, 4, 3, 0, 0.42, 1.3, 0.42)
+  chip.center()
+  shells = new THREE.InstancedMesh(chip, shellMat, BOWL_MAX)
+  shells.count = 0; shells.frustumCulled = false; shells.receiveShadow = true
+  bowl.add(shells)
 
   plateMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.11, 0.018, 48), mat(0x9fd8bf, { roughness: 0.3 }))
   plateMesh.position.set(PLATE.x, TOP + 0.009, PLATE.z); plateMesh.receiveShadow = plateMesh.castShadow = true; scene.add(plateMesh)
@@ -105,5 +116,22 @@ export function spreadRoom(k: number) {
   tray.position.x = -0.62 * k
   potX = k < 1 ? -1.05 * k - 0.06 : -1.05
   pot.position.x = water.position.x = potX
-  bowl.visible = k === 1 // 좁힌 배치에서는 접시와 겹치고, 쓰임도 없어 뺀다
+  // 좁힌 배치에서는 접시와 겹치므로 그릇을 쟁반과 접시 사이 뒤쪽으로 옮긴다
+  if (k < 1) bowl.position.set(0, TOP, -0.36); else bowl.position.set(0.32, TOP, -0.2)
+  BOWL.x = bowl.position.x; BOWL.z = bowl.position.z
 }
+
+const _m = new THREE.Matrix4(), _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _s = new THREE.Vector3()
+export const bowlCount = () => shells.count
+/** 그릇에 껍질 조각 하나를 쌓는다. 많이 찰수록 넓고 높게 쌓인다 */
+export function addShell() {
+  if (shells.count >= BOWL_MAX) return
+  const i = shells.count++, fill = i / BOWL_MAX
+  const rho = Math.sqrt(Math.random()) * (0.035 + 0.06 * fill), a = Math.random() * Math.PI * 2
+  const floor = 0.06 - 0.06 * Math.sqrt(1 - (rho / 0.12) ** 2) // 그릇 안쪽 바닥 높이(반타원)
+  _p.set(Math.cos(a) * rho, floor + 0.005 + Math.random() * fill * 0.045, Math.sin(a) * rho)
+  _q.setFromEuler(_e.set(Math.random() * 6, Math.random() * 6, Math.random() * 6))
+  shells.setMatrixAt(i, _m.compose(_p, _q, _s.setScalar(0.8 + Math.random() * 0.7)))
+  shells.instanceMatrix.needsUpdate = true
+}
+export function clearShells() { shells.count = 0 }

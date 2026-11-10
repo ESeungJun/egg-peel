@@ -1,12 +1,13 @@
 import * as THREE from 'three'
-import { scene, camera, CAM, CENTER, TOP, EH, ER, PLATE, THEME, toScreen, REDUCE_MOTION } from '../core/stage'
+import { scene, camera, CAM, CENTER, TOP, EH, ER, PLATE, THEME, LAYOUT, toScreen, REDUCE_MOTION, shadowDirty } from '../core/stage'
+import { HOLD_Z } from '../core/dims'
 import { mat } from '../core/materials'
 import { eggG, lowest } from '../egg/shape'
 import { crackedEgg, faceCamera, canGrab, exposeAround, disposeEgg, type CrackedEgg, type Frag } from '../egg/crack'
 import { S, stats, countPeeled } from './state'
 import { FX, fling, crumbs, squish, drop } from '../fx/effects'
-import { crackSound, peelSound, plateSound } from '../audio/sound'
-import { plateMesh } from '../world/room'
+import { crackSound, peelSound, plateSound, dumpSound } from '../audio/sound'
+import { plateMesh, bowl, BOWL, BOWL_MAX, addShell, bowlCount, clearShells } from '../world/room'
 import { say, hint, popText, updateHud } from '../ui/hud'
 
 const peeledMat = mat(THEME.white, { roughness: 0.22 })
@@ -17,7 +18,7 @@ export function pickUp(m: THREE.Mesh, at: THREE.Vector3 | null) {
   S.hist = []
   m.rotation.set((Math.random() - 0.5) * 2.4, m.rotation.y, (Math.random() - 0.5) * 2.4)
   m.userData.rest = TOP + lowest(m.quaternion)
-  if (at) m.position.set(at.x, Math.max(m.userData.rest + 0.06, at.y), 0.05)
+  if (at) m.position.set(at.x, Math.min(LAYOUT.ceil, Math.max(m.userData.rest + 0.06, at.y)), HOLD_Z)
   hint('위로 들었다가 작업대에 탁! 내리치세요')
 }
 
@@ -27,7 +28,7 @@ export function slam(s: number, sx: number, sy: number) {
   S.held = null
   const down = new THREE.Vector3(0, -1, 0).applyQuaternion(m.quaternion.clone().invert())
   const egg = crackedEgg(s, down)
-  egg.group.position.set(m.position.x, m.userData.rest, 0.05)
+  egg.group.position.set(m.position.x, m.userData.rest, HOLD_Z)
   egg.group.quaternion.copy(m.quaternion)
   scene.remove(m)
   scene.add(egg.group)
@@ -86,13 +87,31 @@ export function peel(f: Frag, speed: number, dx: number, dy: number, sx: number,
   for (const o of list) {
     scene.attach(o)
     const out = o.getWorldPosition(new THREE.Vector3()).sub(cpos).normalize()
-    fling(o, new THREE.Vector3(dx * 0.0016, -dy * 0.0016, 0).add(out.multiplyScalar(0.35)).add(new THREE.Vector3(0, 0.25, 0)))
+    // 끄는 쪽으로 튀어 나갔다가 껍질 그릇에 담긴다
+    fling(o, new THREE.Vector3(dx * 0.0016, -dy * 0.0016, 0).add(out.multiplyScalar(0.35)).add(new THREE.Vector3(0, 0.25, 0)), 1.6, BOWL, shellLanded)
   }
   peelSound()
   navigator.vibrate?.(8)
   crumbs(f.getWorldPosition(new THREE.Vector3()), 2)
   if (Math.random() < 0.45) popText(sx, sy, ['파삭', '쓱', '톡', '바삭'][Math.floor(Math.random() * 4)])
   if (c.frags.every((o) => o.userData.gone)) finish()
+}
+
+function shellLanded() {
+  addShell()
+  if (bowlCount() >= BOWL_MAX) emptyBowl() // 가득 차면 저절로 털어 비운다
+}
+
+/** 껍질 그릇을 탁 털어 비운다 */
+export function emptyBowl() {
+  if (!bowlCount()) return
+  clearShells()
+  squish(bowl)
+  crumbs(BOWL, 8)
+  dumpSound()
+  navigator.vibrate?.(25)
+  const p = toScreen(bowl)
+  popText(p.x, p.y, '탈탈')
 }
 
 const CHEERS = ['다 깠다!', '깔끔!', '좋아요', '하나 더!', '반질반질']
@@ -124,7 +143,7 @@ function orderDone() {
   }, 2200)
 }
 
-function clearPlate() { for (const p of S.plated) scene.remove(p); S.plated.length = 0 }
+function clearPlate() { for (const p of S.plated) scene.remove(p); S.plated.length = 0; shadowDirty() }
 
 /** 다 깐 계란을 접시에 차곡차곡(4-3-2-1 줄) 놓는다 */
 export function landOnPlate() {
