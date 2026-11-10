@@ -1,10 +1,10 @@
 import * as THREE from 'three'
-import { renderer, scene, camera, CAM, LOOK, VIEW, LAYOUT, toScreen, shadowDirty } from '../core/stage'
+import { renderer, scene, camera, CAM, LOOK, VIEW, LAYOUT, toScreen, toScreenAt, shadowDirty } from '../core/stage'
 import { HOLD_Z } from '../core/dims'
 import { canGrab, type Frag } from '../egg/crack'
-import { pile, buildPile } from '../egg/pile'
+import { takeFromPile, pileCount, refillPile } from '../egg/pile'
 import { S } from './state'
-import { pickUp, slam, setDown, bringToCenter, peel, nearGrabbable, aimFrontier, emptyBowl, REST_UPRIGHT } from './actions'
+import { pickUp, slam, setDown, bringToCenter, peel, nearGrabbable, aimFrontier, emptyBowl, longPeel, REST_UPRIGHT } from './actions'
 import { bowl } from '../world/room'
 import { audio, nopeSound } from '../audio/sound'
 import { hint } from '../ui/hud'
@@ -20,6 +20,8 @@ function aim(e: PointerEvent) {
   ndc.set(e.clientX / VIEW.w * 2 - 1, -((e.clientY - VIEW.top) / VIEW.h) * 2 + 1)
   ray.setFromCamera(ndc, camera)
 }
+let refill = 0
+const LONG_PEEL = 6 // 한 번에 이만큼 이어서 떼면 '쭈욱'
 const isFrag = (o: THREE.Object3D): o is Frag => !!(o as Frag).userData?.local
 
 /** 화면에서 (x, y)에 가장 가까운 것(r px 안). 없으면 undefined */
@@ -59,12 +61,11 @@ function onDown(e: PointerEvent) {
     else pickUp(ce.group as THREE.Mesh, ray.ray.intersectPlane(holdPlane, tmp))
     return
   }
-  const pm = (ray.intersectObjects(pile, false)[0]?.object as THREE.Mesh | undefined) ?? nearest(pile, (m) => m, e.clientX, e.clientY, r)
+  const pm = takeFromPile(ray, (p) => { const q = toScreenAt(p); return Math.hypot(q.x - e.clientX, q.y - e.clientY) }, r)
   if (pm) {
-    const m = pm
-    pile.splice(pile.indexOf(m), 1)
-    pickUp(m, ray.ray.intersectPlane(holdPlane, tmp))
-    if (pile.length < 10) setTimeout(buildPile, 500)
+    pickUp(pm, ray.ray.intersectPlane(holdPlane, tmp))
+    // 얼마 안 남으면 빈 자리를 채운다. 연달아 집어도 한 번만 예약한다
+    if (pileCount() < 10 && !refill) refill = window.setTimeout(() => { refill = 0; refillPile() }, 500)
     return
   }
   if (ray.intersectObject(bowl, false).length) { emptyBowl(); return }
@@ -99,7 +100,7 @@ function onMove(e: PointerEvent) {
       // 누른 채로 쓸면 손이 지나가는 조각도 줄줄이 떨어진다
       const sdx = e.clientX - g.lx, sdy = e.clientY - g.ly, sp = Math.hypot(sdx, sdy) / Math.max(1, now - g.lt)
       const h = ray.intersectObjects([c.white, ...c.frags.filter((f) => !f.userData.gone)], false)[0]
-      if (h && isFrag(h.object) && canGrab(h.object)) { peel(h.object, sp, sdx || 1, sdy, e.clientX, e.clientY); g.n++ }
+      if (h && isFrag(h.object) && canGrab(h.object)) { peel(h.object, sp, sdx || 1, sdy, e.clientX, e.clientY); if (++g.n === LONG_PEEL) longPeel(e.clientX, e.clientY) }
     }
     g.lx = e.clientX; g.ly = e.clientY; g.lt = now
     return

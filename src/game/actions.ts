@@ -3,12 +3,12 @@ import { scene, camera, CAM, CENTER, TOP, EH, ER, PLATE, THEME, LAYOUT, toScreen
 import { HOLD_Z } from '../core/dims'
 import { mat } from '../core/materials'
 import { eggG, lowest } from '../egg/shape'
-import { crackedEgg, faceCamera, canGrab, exposeAround, disposeEgg, type CrackedEgg, type Frag } from '../egg/crack'
+import { crackedEgg, faceCamera, canGrab, exposeAround, disposeEgg, spreadCracks, type CrackedEgg, type Frag } from '../egg/crack'
 import { S, stats, countPeeled } from './state'
 import { FX, fling, crumbs, squish, drop } from '../fx/effects'
-import { crackSound, peelSound, plateSound, dumpSound } from '../audio/sound'
+import { crackSound, peelSound, plateSound, dumpSound, ripSound } from '../audio/sound'
 import { plateMesh, bowl, BOWL, BOWL_MAX, addShell, bowlCount, clearShells } from '../world/room'
-import { say, hint, popText, updateHud } from '../ui/hud'
+import { say, hint, popText, updateHud, quiet } from '../ui/hud'
 
 const peeledMat = mat(THEME.white, { roughness: 0.22 })
 
@@ -28,6 +28,7 @@ export function slam(s: number, sx: number, sy: number) {
   S.held = null
   const down = new THREE.Vector3(0, -1, 0).applyQuaternion(m.quaternion.clone().invert())
   const egg = crackedEgg(s, down)
+  spreadCracks(egg)
   egg.group.position.set(m.position.x, m.userData.rest, HOLD_Z)
   egg.group.quaternion.copy(m.quaternion)
   scene.remove(m)
@@ -36,7 +37,7 @@ export function slam(s: number, sx: number, sy: number) {
   crackSound(s)
   navigator.vibrate?.(20 + s * 30)
   FX.hitstop = performance.now() + 85
-  FX.shake = REDUCE_MOTION.matches ? 0 : 0.006 + s * 0.012
+  FX.shake = REDUCE_MOTION.matches || quiet.on ? 0 : 0.006 + s * 0.012
   squish(egg.group)
   crumbs(egg.group.position, 5 + Math.round(s * 6))
   popText(sx, sy, s > 0.6 ? '쩍!' : '탁!')
@@ -114,7 +115,14 @@ export function emptyBowl() {
   popText(p.x, p.y, '탈탈')
 }
 
-const CHEERS = ['다 깠다!', '깔끔!', '좋아요', '하나 더!', '반질반질']
+/** 한 번 누른 채로 여러 조각을 이어서 벗겼을 때 */
+export function longPeel(sx: number, sy: number) {
+  popText(sx, sy, '쭈욱')
+  ripSound()
+  navigator.vibrate?.(15)
+}
+
+const CHEERS = ['다 깠다!', '깔끔!', '반질반질', '한 판 더요!', '접시 나갑니다']
 function finish() {
   const c = S.center!
   say(CHEERS[Math.floor(Math.random() * CHEERS.length)])

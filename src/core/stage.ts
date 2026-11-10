@@ -9,7 +9,7 @@ export const THEME = {
   bg: '#e9f3ef', exposure: 1, env: 0.3,
   grout: '#cfe3da', tileA: '#f4fbf8', tileB: '#e3f1ea',
   wood: '#b9875a', jars: ['#34c38f', '#ffb547', '#ffffff', '#ff7a6b'], pot: '#c7ccd1', tvFrame: '#24262a',
-  tray: '#e7d2ad', bowl: '#ffffff', shell: '#d9a072', white: '#fffdf8',
+  tray: '#e7d2ad', bowl: '#ffffff', shell: '#d9a072', shellIn: '#f3ece0', white: '#fffdf8',
   sky: '#ffffff', ground: '#b9c7c0', hemi: 0.45, key: '#fff6e8', keyI: 2, tvLight: '#9fd4ff', tvLightI: 0.3,
 }
 
@@ -19,7 +19,7 @@ export const PLATE = new THREE.Vector3(0.62, TOP, -0.12)
 export const CAM = new THREE.Vector3()
 export const LOOK = new THREE.Vector3()
 export const CENTER = new THREE.Vector3() // 까는 자리
-export const LAYOUT = { cs: 3.1, fov: 50, portrait: false, ceil: 1.7 } // cs: 까는 자리에서 키우는 배율, ceil: 들고 있는 계란의 위쪽 한계
+export const LAYOUT = { cs: 3.1, fov: 50, portrait: false, band: false, ceil: 1.7 } // cs: 까는 자리에서 키우는 배율, ceil: 들고 있는 계란의 위쪽 한계
 // 가로 화면: 작업대 정면. 가로/세로 0.8~1.2 사이(태블릿 등)는 LAND 와 PORT 를 비율대로 섞는다.
 // PORT 는 그 섞기의 끝점으로만 쓴다(0.8 미만은 늘 TV 띠가 생겨 BAND 를 쓴다)
 const LAND = { cam: [0, 1.4, 1.0], look: [0, 1.2, -0.5], center: [0, 1.1, 0.25], cs: 3.1, fov: 50 }
@@ -43,6 +43,11 @@ renderer.shadowMap.autoUpdate = false
 /** 다음 프레임에 그림자 맵을 다시 그리게 한다 */
 export const shadowDirty = () => { renderer.shadowMap.needsUpdate = true }
 shadowDirty()
+/**
+ * 처음 몇 프레임은 그림자를 계속 다시 그린다. three.js 는 첫 그림자 패스를 조명 수 0으로 컴파일하고
+ * 두 번째 패스에서 조명 수가 든 깊이 셰이더를 다시 만든다. 이걸 첫 터치가 아니라 로딩 때 끝내려는 것이다
+ */
+export const WARM = { n: 3 }
 renderer.shadowMap.type = THREE.PCFShadowMap // 0.187부터 PCFSoft는 없어지고 PCF가 부드럽게 처리한다
 renderer.toneMapping = THREE.NeutralToneMapping // 밝은 파스텔 장면에서 ACES 보다 채도를 덜 뺀다
 renderer.toneMappingExposure = THEME.exposure
@@ -61,7 +66,7 @@ function buildEnv() {
 buildEnv()
 scene.environmentIntensity = THEME.env
 // 폰에서 다른 앱에 다녀오면 컨텍스트를 잃을 수 있다. three.js 가 나머지는 되살리지만 환경맵과 그림자 맵은 직접 다시 만든다
-renderer.domElement.addEventListener('webglcontextrestored', () => { buildEnv(); shadowDirty() })
+renderer.domElement.addEventListener('webglcontextrestored', () => { buildEnv(); shadowDirty(); WARM.n = 3 })
 
 export const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 20)
 
@@ -77,6 +82,7 @@ export function resizeStage(top = 0) {
   const L = top > 0 ? BAND : camera.aspect < 1.2 ? mix(LAND, PORT, Math.min(1, (1.2 - camera.aspect) / 0.4)) : LAND
   CAM.fromArray(L.cam); LOOK.fromArray(L.look); CENTER.fromArray(L.center)
   LAYOUT.cs = L.cs; LAYOUT.fov = L.fov; LAYOUT.portrait = camera.aspect < 1
+  LAYOUT.band = top > 0
   LAYOUT.ceil = heldCeiling(CAM, top > 0)
   camera.fov = L.fov
   camera.position.copy(CAM)
@@ -93,7 +99,8 @@ function mix(a: Layout, b: Layout, t: number): Layout {
 
 /** 월드 좌표 → 화면 픽셀(clientX/Y 와 같은 기준) */
 const _p = new THREE.Vector3()
-export function toScreen(o: THREE.Object3D) {
-  o.getWorldPosition(_p).project(camera)
+export const toScreen = (o: THREE.Object3D) => toScreenAt(o.getWorldPosition(_p))
+export function toScreenAt(p: THREE.Vector3) {
+  _p.copy(p).project(camera)
   return { x: (_p.x + 1) / 2 * VIEW.w, y: (1 - _p.y) / 2 * VIEW.h + VIEW.top }
 }

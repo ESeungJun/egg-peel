@@ -81,6 +81,18 @@ export function crackedEgg(strength: number, down = new THREE.Vector3(0, -1, 0))
   return { group, white, frags, impact }
 }
 
+/** 내리친 직후: 부딪힌 곳에서 먼 조각일수록 늦게 벌어져 금이 번지는 것처럼 보인다(0.4초 안에 끝난다) */
+export function spreadCracks(e: CrackedEgg, delay = 85) {
+  const list = e.frags.filter((f) => f.userData.state === 'cracked').sort((a, b) => a.userData.dist - b.userData.dist)
+  const step = Math.min(60, 400 / Math.max(1, list.length))
+  list.forEach((f, i) => {
+    if (i < 2) return // 부딪힌 자리는 바로 벌어진다
+    f.userData.lift = 1
+    setLift(f, 1)
+    setTimeout(() => setLift(f, 2), delay + i * step)
+  })
+}
+
 /** 금 간 곳이 카메라 쪽을 보게 하는 회전(그 축으로는 무작위로 돌림) */
 export function faceCamera(impact: THREE.Vector3) {
   const toCam = CAM.clone().sub(CENTER).normalize(), axis = impact.clone().normalize()

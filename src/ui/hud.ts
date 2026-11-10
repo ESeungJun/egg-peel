@@ -1,8 +1,11 @@
-import { stats } from '../game/state'
+import { stats, store } from '../game/state'
 
 const $ = (id: string) => document.getElementById(id)!
 let toastT = 0
+/** 조용히: 영상 보는 데 방해되는 글자·토스트·흔들림을 끈다(소리와 아래 안내는 남는다) */
+export const quiet = { on: store.get('quiet') === '1' }
 export function say(s: string) {
+  if (quiet.on) return
   const t = $('toast')
   t.textContent = s
   t.classList.add('on')
@@ -11,6 +14,7 @@ export function say(s: string) {
 }
 export const hint = (s: string) => { $('hint').textContent = s }
 export function popText(x: number, y: number, s: string) {
+  if (quiet.on) return
   const d = document.createElement('div')
   d.className = 'pop'
   d.textContent = s

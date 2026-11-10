@@ -32,6 +32,8 @@ export const peelSound = () => { for (let k = 0; k < 3; k++) burst('highpass', 2
 export const plateSound = () => tone(900, 880, 0.15, 0.45, 'triangle')
 /** 껍질 그릇 비우는 소리: 껍질이 우수수 + 그릇 통 */
 export const dumpSound = () => { for (let k = 0; k < 6; k++) burst('highpass', 2200 + Math.random() * 2600, 0.7, 0.16, 0.04, k * 0.03 + Math.random() * 0.015); tone(520, 300, 0.12, 0.18, 'triangle') }
+/** 껍질이 길게 벗겨지는 소리 */
+export const ripSound = () => { burst('highpass', 1900, 0.7, 0.2, 0.32); burst('bandpass', 3200, 2, 0.12, 0.24, 0.05) }
 export const nopeSound = () => tone(240, 200, 0.12, 0.06, 'triangle')
 
 /** 주방 소리: 환풍기 웅웅 + 냄비 보글보글. 유튜브보다 작게 */

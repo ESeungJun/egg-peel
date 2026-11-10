@@ -35,7 +35,9 @@ export function buildRoom() {
     for (let i = 0; i < 18; i++) { g.fillStyle = `hsla(30,45%,${55 + Math.random() * 15}%,.55)`; g.fillRect(0, i * 7 + Math.random() * 3, w, 2 + Math.random() * 3) }
     for (let x = 0; x < w; x += 64) { g.fillStyle = 'rgba(90,60,30,.25)'; g.fillRect(x, 0, 2, h) }
   }, 4, 1)
-  const counter = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.9, 1.4), mat(0xffffff, { roughness: 0.55, map: woodTex }))
+  // 윗면만 나뭇결. 옆면에 같은 무늬를 쓰면 세로로 늘어져 보인다
+  const top = mat(0xffffff, { roughness: 0.55, map: woodTex }), side = mat('#c99d6c', { roughness: 0.6 })
+  const counter = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.9, 1.4), [side, side, top, side, side, side])
   counter.position.set(0, TOP - 0.45, 0); counter.receiveShadow = true; scene.add(counter)
 
   for (const sx of [-1, 1]) {
