@@ -23,7 +23,10 @@ function place(i: number) {
   mesh.setMatrixAt(i, _m.compose(_p.copy(s.p).setY(s.p.y + s.off), s.q, _one))
   mesh.instanceMatrix.needsUpdate = true
 }
-function sync() { mesh.count = live.length; for (let i = 0; i < live.length; i++) place(i); shadowDirty() }
+function sync() {
+  mesh.boundingSphere = null // 광선 검사가 옛 범위로 걸러 내지 않게 다시 계산시킨다
+  mesh.count = live.length; for (let i = 0; i < live.length; i++) place(i); shadowDirty()
+}
 
 export function makeEgg() {
   const m = new THREE.Mesh(eggG, shellMat)

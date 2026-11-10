@@ -5,7 +5,7 @@ import { canGrab, type Frag } from '../egg/crack'
 import { takeFromPile, pileCount, refillPile } from '../egg/pile'
 import { S } from './state'
 import { pickUp, slam, setDown, bringToCenter, peel, nearGrabbable, aimFrontier, emptyBowl, longPeel, REST_UPRIGHT } from './actions'
-import { bowl } from '../world/room'
+import { bowl, bowlCount } from '../world/room'
 import { audio, nopeSound } from '../audio/sound'
 import { hint } from '../ui/hud'
 
@@ -52,7 +52,9 @@ function onDown(e: PointerEvent) {
     if (hit) { S.spin = { x: e.clientX, y: e.clientY }; c.aim = null; return }
   }
   // 작업대 위 계란: 정확히 맞지 않아도 손가락 근처(r px)면 잡는다. 폰에서는 계란이 지름 10px 남짓이라
-  const r = e.pointerType === 'mouse' ? 24 : 44
+  // 껍질이 든 그릇을 정확히 눌렀으면 근처 계란을 대신 집지 않는다(정확히 맞은 계란은 그대로 집힌다)
+  const onBowl = bowlCount() > 0 && ray.intersectObject(bowl, false).length > 0
+  const r = onBowl ? 0 : e.pointerType === 'mouse' ? 24 : 44
   const usable = S.counterEggs.filter((ce) => !ce.egg || !S.center)
   const ce = usable.find((x) => ray.intersectObject(x.group, true).length) ?? nearest(usable, (x) => x.group, e.clientX, e.clientY, r)
   if (ce) {
@@ -68,7 +70,7 @@ function onDown(e: PointerEvent) {
     if (pileCount() < 10 && !refill) refill = window.setTimeout(() => { refill = 0; refillPile() }, 500)
     return
   }
-  if (ray.intersectObject(bowl, false).length) { emptyBowl(); return }
+  if (onBowl) { emptyBowl(); return }
   if (c && c.ready) { S.spin = { x: e.clientX, y: e.clientY }; c.aim = null }
 }
 

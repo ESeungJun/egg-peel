@@ -89,7 +89,7 @@ export function spreadCracks(e: CrackedEgg, delay = 85) {
     if (i < 2) return // 부딪힌 자리는 바로 벌어진다
     f.userData.lift = 1
     setLift(f, 1)
-    setTimeout(() => setLift(f, 2), delay + i * step)
+    setTimeout(() => { if (!f.userData.gone) setLift(f, 2) }, delay + i * step) // 그새 떼어 낸 조각은 건드리지 않는다
   })
 }
 
