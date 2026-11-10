@@ -1,5 +1,6 @@
 import type * as THREE from 'three'
 import type { CrackedEgg, Frag } from '../egg/crack'
+import { ymd, toCount } from './days'
 
 export interface CounterEgg { group: THREE.Object3D; egg?: CrackedEgg }
 export interface Center extends CrackedEgg {
@@ -21,8 +22,10 @@ export const S = {
 }
 
 const K = 'egg-peel:'
-const dayKey = () => `${K}day:${new Date().toLocaleDateString('sv')}` // YYYY-MM-DD(내 시간대)
-const num = (k: string) => { const v = Number(localStorage.getItem(k)); return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0 }
+const dayKey = () => `${K}day:${ymd(new Date())}` // YYYY-MM-DD(내 시간대)
+const num = (k: string) => { try { return toCount(localStorage.getItem(k)) } catch { return 0 } }
+/** 그날(YYYY-MM-DD) 깐 개수 */
+export const dayCount = (day: string) => num(`${K}day:${day}`)
 
 export const stats = { total: num(K + 'total'), today: num(dayKey()), order: 8, ono: 1, prog: 0 }
 

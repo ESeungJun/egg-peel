@@ -22,7 +22,8 @@
     <div class="row"><button type="button" id="ytcancel" hidden>취소</button><button type="submit">틀기</button></div>
   </form>
 </div>
-<div class="hud"><span class="chip" id="cnt">깐 계란 0개</span><span class="chip" id="today">오늘 0개</span></div>
+<div class="hud"><span class="chip" id="cnt">깐 계란 0개</span><button class="chip" id="today" aria-expanded="false" aria-controls="cal">오늘 0개</button></div>
+<div class="cal" id="cal" role="region" aria-label="최근 4주 깐 계란"></div>
 <div class="ticket"><span>주문 #<span id="ono">1</span></span><b id="otext">계란 8개</b><div class="bar"><i id="obar"></i></div></div>
 <div class="tools">
   <button id="tvchange" hidden>TV 링크 바꾸기</button>

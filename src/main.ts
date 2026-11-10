@@ -12,6 +12,7 @@ import { setAmbience, ambOn } from './audio/sound'
 import { store } from './game/state'
 import { hint, updateHud, quiet } from './ui/hud'
 import { initTv, placeTv, tvBand } from './ui/tv'
+import { initCalendar } from './ui/calendar'
 
 const ease = (t: number) => 1 - (1 - t) ** 3
 const timer = new THREE.Timer()
@@ -98,6 +99,7 @@ resize()
 updateHud()
 initTv()
 initInput()
+initCalendar()
 
 // 처음 화면: 반쯤 깐 계란을 하나 올려 둔다
 {
