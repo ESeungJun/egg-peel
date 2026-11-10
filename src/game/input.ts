@@ -1,14 +1,16 @@
 import * as THREE from 'three'
-import { renderer, scene, camera, CAM, LOOK, VIEW, toScreen } from '../core/stage'
+import { renderer, scene, camera, CAM, LOOK, VIEW, LAYOUT, toScreen, toScreenAt, shadowDirty } from '../core/stage'
+import { HOLD_Z } from '../core/dims'
 import { canGrab, type Frag } from '../egg/crack'
-import { pile, buildPile } from '../egg/pile'
+import { takeFromPile, pileCount, refillPile } from '../egg/pile'
 import { S } from './state'
-import { pickUp, slam, setDown, bringToCenter, peel, nearGrabbable, aimFrontier, REST_UPRIGHT } from './actions'
+import { pickUp, slam, setDown, bringToCenter, peel, nearGrabbable, aimFrontier, emptyBowl, longPeel, REST_UPRIGHT } from './actions'
+import { bowl, bowlCount } from '../world/room'
 import { audio, nopeSound } from '../audio/sound'
 import { hint } from '../ui/hud'
 
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), tmp = new THREE.Vector3()
-const holdPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -0.05) // 들고 있는 계란이 움직이는 면(z=0.05)
+const holdPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -HOLD_Z) // 들고 있는 계란이 움직이는 면
 function aim(e: PointerEvent) {
   // 화면 흔들림이 섞이지 않은 원래 시점으로 광선을 쏜다(흔들리는 중에 눌러도 빗나가지 않게)
   camera.position.copy(CAM)
@@ -18,6 +20,8 @@ function aim(e: PointerEvent) {
   ndc.set(e.clientX / VIEW.w * 2 - 1, -((e.clientY - VIEW.top) / VIEW.h) * 2 + 1)
   ray.setFromCamera(ndc, camera)
 }
+let refill = 0
+const LONG_PEEL = 6 // 한 번에 이만큼 이어서 떼면 '쭈욱'
 const isFrag = (o: THREE.Object3D): o is Frag => !!(o as Frag).userData?.local
 
 /** 화면에서 (x, y)에 가장 가까운 것(r px 안). 없으면 undefined */
@@ -48,7 +52,9 @@ function onDown(e: PointerEvent) {
     if (hit) { S.spin = { x: e.clientX, y: e.clientY }; c.aim = null; return }
   }
   // 작업대 위 계란: 정확히 맞지 않아도 손가락 근처(r px)면 잡는다. 폰에서는 계란이 지름 10px 남짓이라
-  const r = e.pointerType === 'mouse' ? 24 : 44
+  // 껍질이 든 그릇을 정확히 눌렀으면 근처 계란을 대신 집지 않는다(정확히 맞은 계란은 그대로 집힌다)
+  const onBowl = bowlCount() > 0 && ray.intersectObject(bowl, false).length > 0
+  const r = onBowl ? 0 : e.pointerType === 'mouse' ? 24 : 44
   const usable = S.counterEggs.filter((ce) => !ce.egg || !S.center)
   const ce = usable.find((x) => ray.intersectObject(x.group, true).length) ?? nearest(usable, (x) => x.group, e.clientX, e.clientY, r)
   if (ce) {
@@ -57,14 +63,14 @@ function onDown(e: PointerEvent) {
     else pickUp(ce.group as THREE.Mesh, ray.ray.intersectPlane(holdPlane, tmp))
     return
   }
-  const pm = (ray.intersectObjects(pile, false)[0]?.object as THREE.Mesh | undefined) ?? nearest(pile, (m) => m, e.clientX, e.clientY, r)
+  const pm = takeFromPile(ray, (p) => { const q = toScreenAt(p); return Math.hypot(q.x - e.clientX, q.y - e.clientY) }, r)
   if (pm) {
-    const m = pm
-    pile.splice(pile.indexOf(m), 1)
-    pickUp(m, ray.ray.intersectPlane(holdPlane, tmp))
-    if (pile.length < 10) setTimeout(buildPile, 500)
+    pickUp(pm, ray.ray.intersectPlane(holdPlane, tmp))
+    // 얼마 안 남으면 빈 자리를 채운다. 연달아 집어도 한 번만 예약한다
+    if (pileCount() < 10 && !refill) refill = window.setTimeout(() => { refill = 0; refillPile() }, 500)
     return
   }
+  if (onBowl) { emptyBowl(); return }
   if (c && c.ready) { S.spin = { x: e.clientX, y: e.clientY }; c.aim = null }
 }
 
@@ -74,8 +80,9 @@ function onMove(e: PointerEvent) {
   if (S.held) {
     if (!ray.ray.intersectPlane(holdPlane, tmp)) return
     const rest: number = S.held.userData.rest
-    const y = Math.max(rest, Math.min(1.7, tmp.y)), x = Math.max(-1.2, Math.min(1.2, tmp.x))
-    S.held.position.set(x, y, 0.05)
+    // 위쪽 한계: 벽 TV(HTML)에 가려지지 않는 높이까지만
+    const y = Math.max(rest, Math.min(LAYOUT.ceil, tmp.y)), x = Math.max(-1.2, Math.min(1.2, tmp.x))
+    S.held.position.set(x, y, HOLD_Z)
     S.hist.push({ y, t: now })
     while (S.hist.length > 2 && now - S.hist[0].t > 120) S.hist.shift()
     const h = S.hist, vy = h.length > 1 ? (h[h.length - 1].y - h[0].y) / ((h[h.length - 1].t - h[0].t) / 1000 || 1) : 0
@@ -95,7 +102,7 @@ function onMove(e: PointerEvent) {
       // 누른 채로 쓸면 손이 지나가는 조각도 줄줄이 떨어진다
       const sdx = e.clientX - g.lx, sdy = e.clientY - g.ly, sp = Math.hypot(sdx, sdy) / Math.max(1, now - g.lt)
       const h = ray.intersectObjects([c.white, ...c.frags.filter((f) => !f.userData.gone)], false)[0]
-      if (h && isFrag(h.object) && canGrab(h.object)) { peel(h.object, sp, sdx || 1, sdy, e.clientX, e.clientY); g.n++ }
+      if (h && isFrag(h.object) && canGrab(h.object)) { peel(h.object, sp, sdx || 1, sdy, e.clientX, e.clientY); if (++g.n === LONG_PEEL) longPeel(e.clientX, e.clientY) }
     }
     g.lx = e.clientX; g.ly = e.clientY; g.lt = now
     return
@@ -114,6 +121,7 @@ function onUp() {
   if (S.held) setDown()
   S.grab = null
   S.spin = null
+  shadowDirty() // 마지막 프레임 뒤에 돌린 만큼도 그림자에 반영
 }
 
 const el = renderer.domElement

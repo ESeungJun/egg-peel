@@ -18,4 +18,9 @@ export function canvasTex(w: number, h: number, draw: (g: CanvasRenderingContext
 }
 
 export const shellMat = mat(THEME.shell, { roughness: 0.55, side: THREE.DoubleSide })
+// 껍질 안쪽 면은 흰 막 색으로. 재질은 하나 그대로라 셰이더 프로그램 수는 늘지 않는다
+const inner = new THREE.Color(THEME.shellIn)
+shellMat.onBeforeCompile = (sh) => {
+  sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>\n\tif ( ! gl_FrontFacing ) diffuseColor.rgb = vec3( ${inner.r.toFixed(4)}, ${inner.g.toFixed(4)}, ${inner.b.toFixed(4)} );`)
+}
 export const whiteMat = mat(THEME.white, { roughness: 0.22 })

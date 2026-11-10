@@ -1,7 +1,7 @@
 {
   "name": "egg-peel",
   "private": true,
-  "version": "1.2.1",
+  "version": "1.3.0",
   "type": "module",
   "homepage": "https://egg-peel.pages.dev",
   "repository": {
@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "test": "node --test",
     "preview": "vite preview",
     "deploy": "npm run build && npx --yes wrangler pages deploy dist --project-name egg-peel --branch main"
   },
